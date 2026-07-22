@@ -1,4 +1,4 @@
-name: Verified Master Build Android APK
+name: Zeeshan AI Chat - Native Build
 
 on:
   push:
@@ -6,182 +6,388 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-22.04
+  build-android-native:
+    runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
 
-    - name: Install System Dependencies
+    - name: Dynamically Create Native Kotlin Project
       run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential libssl-dev libffi-dev python3-dev ccache git libffi-dev lld zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libreadline-dev libsqlite3-dev libgdbm-dev libdb5.3-dev libbz2-dev libexpat1-dev liblzma-dev tk-dev
-        pip install --upgrade pip
-        pip install "buildozer" "cython<3.0.0" sh
+        mkdir -p ZeeshanAIChat/app/src/main/java/com/zeeshan/aichat
+        mkdir -p ZeeshanAIChat/app/src/main/res/layout
+        mkdir -p ZeeshanAIChat/app/src/main/res/values
+        cd ZeeshanAIChat
 
-    - name: Accept Android SDK Licenses
-      run: |
-        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-
-    - name: Dynamically Generate App Code & Build Config
-      run: |
-        # ------------------------------------
-        # 1. High-Performance main.py
-        # ------------------------------------
-        cat << 'EOF' > main.py
-        import random
-        import threading
-        from kivy.app import App
-        from kivy.clock import mainthread
-        from kivy.uix.boxlayout import BoxLayout
-        from kivy.uix.button import Button
-        from kivy.uix.label import Label
-        from kivy.uix.scrollview import ScrollView
-        from kivy.uix.textinput import TextInput
-
-        class StoryAIApp(App):
-            def build(self):
-                self.title = "Offline AI Story Generator"
-                layout = BoxLayout(orientation='vertical', padding=15, spacing=10)
-
-                title_label = Label(
-                    text="🤖 Offline AI Story Generator",
-                    font_size="22sp",
-                    bold=True,
-                    size_hint_y=None,
-                    height=50
-                )
-                layout.add_widget(title_label)
-
-                self.input_box = TextInput(
-                    hint_text="कहानी का टॉपिक या शुरुआत लिखें...\n(उदा: Once upon a time, a brave knight)",
-                    multiline=True,
-                    size_hint_y=None,
-                    height=100
-                )
-                layout.add_widget(self.input_box)
-
-                self.btn = Button(
-                    text="⚡ कहानी बनाएँ (Generate Story)",
-                    size_hint_y=None,
-                    height=55,
-                    background_color=(0.1, 0.5, 0.9, 1),
-                    bold=True
-                )
-                self.btn.bind(on_press=self.generate_story_thread)
-                layout.add_widget(self.btn)
-
-                scroll = ScrollView()
-                self.output_label = Label(
-                    text="आपकी जनरेट की गई कहानी यहाँ दिखेगी...",
-                    size_hint_y=None,
-                    font_size="16sp",
-                    halign="left",
-                    valign="top"
-                )
-                self.output_label.bind(texture_size=lambda instance, value: setattr(instance, 'height', value[1]))
-                self.output_label.bind(width=lambda instance, value: setattr(instance, 'text_size', (value, None)))
-                scroll.add_widget(self.output_label)
-                layout.add_widget(scroll)
-
-                return layout
-
-            def generate_story_thread(self, instance):
-                self.btn.disabled = True
-                self.output_label.text = "🧠 AI कहानी तैयार कर रहा है... कृपया प्रतीक्षा करें।"
-                threading.Thread(target=self.run_story_generator).start()
-
-            def run_story_generator(self):
-                prompt = self.input_box.text.strip()
-                if not prompt:
-                    prompt = "In a quiet village hidden behind ancient mountains"
-
-                story = self.craft_story(prompt)
-                self.update_output(story)
-
-            def craft_story(self, prompt):
-                plots = [
-                    "discovered a hidden artifact that radiated an unknown golden light. As they touched it, time seemed to stand still.",
-                    "embarked on a journey to unlock the secrets of the ancient forest, facing challenges that tested their courage.",
-                    "found a forgotten map leading to an underground city full of wonder and ancient magic.",
-                    "encountered a mysterious traveler who handed them an old journal containing prophecies of the future."
-                ]
-                climax = [
-                    "Suddenly, shadows gathered around, requiring a choice between safety and ultimate truth.",
-                    "With a burst of determination, they unlocked the final door, revealing a secret that changed everything.",
-                    "The path ahead was dangerous, but their resolve was unbreakable as the mystery unraveled."
-                ]
-                ending = [
-                    "In the end, peace returned to the realm, and their legend was written in history books for generations.",
-                    "And so, a new chapter began, proving that bravery and hope can overcome any darkness.",
-                    "They smiled at the horizon, knowing that their adventure was only just beginning."
-                ]
-
-                result = f"📖 **Generated Story**\n\n{prompt} {random.choice(plots)}\n\n{random.choice(climax)}\n\n{random.choice(ending)}"
-                return result
-
-            @mainthread
-            def update_output(self, text):
-                self.output_label.text = text
-                self.btn.disabled = False
-
-        if __name__ == '__main__':
-            StoryAIApp().run()
+        # 1. settings.gradle.kts
+        cat << 'EOF' > settings.gradle.kts
+        pluginManagement {
+            repositories {
+                google()
+                mavenCentral()
+                gradlePluginPortal()
+            }
+        }
+        dependencyResolutionManagement {
+            repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+            repositories {
+                google()
+                mavenCentral()
+            }
+        }
+        rootProject.name = "Zeeshan AI Chat"
+        include(":app")
         EOF
 
-        # ------------------------------------
-        # 2. requirements.txt
-        # ------------------------------------
-        cat << 'EOF' > requirements.txt
-        kivy
+        # 2. Project build.gradle.kts
+        cat << 'EOF' > build.gradle.kts
+        buildscript {
+            repositories {
+                google()
+                mavenCentral()
+            }
+            dependencies {
+                classpath("com.android.tools.build:gradle:8.1.0")
+                classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0")
+            }
+        }
         EOF
 
-        # ------------------------------------
-        # 3. Optimized buildozer.spec
-        # ------------------------------------
-        cat << 'EOF' > buildozer.spec
-        [app]
-        title = StoryAI App
-        package.name = storyaiapp
-        package.domain = org.test
-        source.dir = .
-        source.include_exts = py,png,jpg,kv,atlas
-        version = 1.0
-        requirements = python3,kivy
-        orientation = portrait
-        fullscreen = 0
-        android.permissions = INTERNET
-        android.api = 33
-        android.minapi = 21
-        android.accept_sdk_license = True
-        android.private_storage = True
-        android.archs = arm64-v8a
-        android.sdk_path = /usr/local/lib/android/sdk
+        # 3. App build.gradle.kts
+        cat << 'EOF' > app/build.gradle.kts
+        plugins {
+            id("com.android.application")
+            id("org.jetbrains.kotlin.android")
+        }
 
-        [buildozer]
-        log_level = 2
-        warn_on_root = 1
+        android {
+            namespace = "com.zeeshan.aichat"
+            compileSdk = 34
+
+            defaultConfig {
+                applicationId = "com.zeeshan.aichat"
+                minSdk = 24
+                targetSdk = 34
+                versionCode = 1
+                versionName = "1.0"
+            }
+
+            buildTypes {
+                release {
+                    isMinifyEnabled = false
+                    proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+                }
+            }
+            compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_1_8
+                targetCompatibility = JavaVersion.VERSION_1_8
+            }
+            kotlinOptions {
+                jvmTarget = "1.8"
+            }
+        }
+
+        dependencies {
+            implementation("androidx.core:core-ktx:1.12.0")
+            implementation("androidx.appcompat:appcompat:1.6.1")
+            implementation("com.google.android.material:material:1.11.0")
+            implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+        }
         EOF
 
-    - name: Build APK with Buildozer
+        # 4. AndroidManifest.xml (With Permissions)
+        cat << 'EOF' > app/src/main/AndroidManifest.xml
+        <?xml version="1.0" encoding="utf-8"?>
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+            package="com.zeeshan.aichat">
+            
+            <!-- Permissions Required by App -->
+            <uses-permission android:name="android.permission.RECORD_AUDIO" />
+            <uses-permission android:name="android.permission.INTERNET" /> <!-- Required by some TTS engines -->
+
+            <application
+                android:allowBackup="true"
+                android:icon="@mipmap/ic_launcher"
+                android:label="Zeeshan AI Chat"
+                android:roundIcon="@mipmap/ic_launcher_round"
+                android:supportsRtl="true"
+                android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+                <activity
+                    android:name=".MainActivity"
+                    android:exported="true"
+                    android:windowSoftInputMode="adjustResize">
+                    <intent-filter>
+                        <action android:name="android.intent.action.MAIN" />
+                        <category android:name="android.intent.category.LAUNCHER" />
+                    </intent-filter>
+                </activity>
+            </application>
+        </manifest>
+        EOF
+
+        # 5. UI Layout (activity_main.xml)
+        cat << 'EOF' > app/src/main/res/layout/activity_main.xml
+        <?xml version="1.0" encoding="utf-8"?>
+        <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:background="#F5F5F5">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="🤖 Zeeshan AI Chat"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:gravity="center"
+                android:paddingBottom="16dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                
+                <EditText
+                    android:id="@+id/inputBox"
+                    android:layout_width="0dp"
+                    android:layout_height="60dp"
+                    android:layout_weight="1"
+                    android:hint="Type or speak a topic..."
+                    android:background="#FFFFFF"
+                    android:padding="10dp"
+                    android:textSize="16sp" />
+
+                <ImageButton
+                    android:id="@+id/btnMic"
+                    android:layout_width="60dp"
+                    android:layout_height="60dp"
+                    android:src="@android:drawable/ic_btn_speak_now"
+                    android:background="#E0E0E0"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/btnGenerate"
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:text="⚡ Generate Story"
+                android:backgroundTint="#007BFF"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:layout_marginTop="12dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="12dp">
+                
+                <Button
+                    android:id="@+id/btnRead"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="🔊 Read Aloud"
+                    android:backgroundTint="#28A745" />
+
+                <Button
+                    android:id="@+id/btnStop"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="⏹️ Stop Audio"
+                    android:backgroundTint="#DC3545"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginTop="16dp"
+                android:background="#FFFFFF"
+                android:padding="12dp">
+                
+                <TextView
+                    android:id="@+id/outputText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Output will appear here..."
+                    android:textSize="18sp"
+                    android:textColor="#000000" />
+            </ScrollView>
+        </LinearLayout>
+        EOF
+
+        # 6. Main Logic (MainActivity.kt)
+        cat << 'EOF' > app/src/main/java/com/zeeshan/aichat/MainActivity.kt
+        package com.zeeshan.aichat
+
+        import android.Manifest
+        import android.content.Intent
+        import android.content.pm.PackageManager
+        import android.os.Bundle
+        import android.speech.RecognizerIntent
+        import android.speech.tts.TextToSpeech
+        import android.widget.Button
+        import android.widget.EditText
+        import android.widget.ImageButton
+        import android.widget.TextView
+        import android.widget.Toast
+        import androidx.appcompat.app.AppCompatActivity
+        import androidx.core.app.ActivityCompat
+        import androidx.core.content.ContextCompat
+        import java.util.*
+
+        class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
+
+            private lateinit var tts: TextToSpeech
+            private lateinit var inputBox: EditText
+            private lateinit var outputText: TextView
+            private val SPEECH_REQUEST_CODE = 100
+            private val PERMISSION_REQUEST_CODE = 101
+
+            override fun onCreate(savedInstanceState: Bundle?) {
+                super.onCreate(savedInstanceState)
+                setContentView(R.layout.activity_main)
+
+                // Initialize Views
+                inputBox = findViewById(R.id.inputBox)
+                outputText = findViewById(R.id.outputText)
+                val btnMic = findViewById<ImageButton>(R.id.btnMic)
+                val btnGenerate = findViewById<Button>(R.id.btnGenerate)
+                val btnRead = findViewById<Button>(R.id.btnRead)
+                val btnStop = findViewById<Button>(R.id.btnStop)
+
+                // Request Permissions on Startup
+                checkPermissions()
+
+                // Initialize TTS
+                tts = TextToSpeech(this, this)
+
+                // Mic Button Click listener
+                btnMic.setOnClickListener {
+                    startVoiceInput()
+                }
+
+                // Generate Button Click listener
+                btnGenerate.setOnClickListener {
+                    val prompt = inputBox.text.toString().trim()
+                    if (prompt.isNotEmpty()) {
+                        outputText.text = "AI सोच रहा है..."
+                        val story = generateHindiStory(prompt)
+                        outputText.text = story
+                    } else {
+                        Toast.makeText(this, "Please enter a topic!", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                // TTS Read Button
+                btnRead.setOnClickListener {
+                    val textToRead = outputText.text.toString()
+                    if (textToRead.isNotEmpty() && textToRead != "Output will appear here...") {
+                        tts.speak(textToRead, TextToSpeech.QUEUE_FLUSH, null, "")
+                    }
+                }
+
+                // TTS Stop Button
+                btnStop.setOnClickListener {
+                    if (tts.isSpeaking) {
+                        tts.stop()
+                    }
+                }
+            }
+
+            private fun checkPermissions() {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                    ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), PERMISSION_REQUEST_CODE)
+                }
+            }
+
+            private fun startVoiceInput() {
+                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN") // Default mic language Hindi/English mix
+                intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
+                
+                try {
+                    startActivityForResult(intent, SPEECH_REQUEST_CODE)
+                } catch (e: Exception) {
+                    Toast.makeText(this, "Mic not supported on this device.", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+                super.onActivityResult(requestCode, resultCode, data)
+                if (requestCode == SPEECH_REQUEST_CODE && resultCode == RESULT_OK && data != null) {
+                    val result = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                    inputBox.setText(result?.get(0))
+                }
+            }
+
+            override fun onInit(status: Int) {
+                if (status == TextToSpeech.SUCCESS) {
+                    // Set AI Voice to Hindi
+                    val result = tts.setLanguage(Locale("hi", "IN"))
+                    if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                        Toast.makeText(this, "Hindi Voice Data not found!", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+
+            // Zeeshan AI Offline Engine (Simulated Logic for Fast & Crash-Free execution)
+            private fun generateHindiStory(prompt: String): String {
+                val intros = listOf(
+                    "एक समय की बात है, जब दुनिया बहुत अलग थी।",
+                    "बहुत पुरानी बात है, एक रहस्यमयी जगह पर।",
+                    "यह कहानी तब की है, जब जादू सच्चाई हुआ करता था।"
+                )
+                val plots = listOf(
+                    "एक दिन, एक अनजान शख्स आया और उसने एक ऐसा राज़ खोला जिसने सब कुछ बदल दिया।",
+                    "वहां एक पुरानी किताब मिली, जिसमें भविष्य का हर पन्ना लिखा हुआ था।",
+                    "अचानक आसमान में एक अजीब सी रोशनी दिखी, और एक नया सफर शुरू हो गया।"
+                )
+                val endings = listOf(
+                    "अंत में, सच्चाई की जीत हुई और वो हमेशा के लिए इतिहास के पन्नों में अमर हो गए।",
+                    "और इस तरह, एक नई शुरुआत हुई, जो हमेशा याद रखी जाएगी।",
+                    "उन्होंने साबित कर दिया कि हिम्मत और सच्चाई से कोई भी मुश्किल आसान हो सकती है।"
+                )
+
+                val intro = intros.random()
+                val plot = plots.random()
+                val ending = endings.random()
+
+                return "आपके विषय '$prompt' पर आधारित कहानी:\n\n$intro $plot $ending"
+            }
+
+            override fun onDestroy() {
+                if (::tts.isInitialized) {
+                    tts.stop()
+                    tts.shutdown()
+                }
+                super.onDestroy()
+            }
+        }
+        EOF
+
+    - name: Build APK with Gradle
       run: |
-        buildozer android debug
+        cd ZeeshanAIChat
+        gradle wrapper
+        ./gradlew assembleDebug
 
-    - name: Upload APK Artifact
+    - name: Upload AI Chat APK
       uses: actions/upload-artifact@v4
       with:
-        name: StoryAI-App-APK
-        path: bin/*.apk
+        name: Zeeshan-AI-Chat-App
+        path: ZeeshanAIChat/app/build/outputs/apk/debug/app-debug.apk
         
