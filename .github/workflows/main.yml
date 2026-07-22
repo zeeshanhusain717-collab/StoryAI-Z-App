@@ -19,12 +19,23 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
 
+    # یہ ایکشن Gradle کو کیش (Cache) کرے گا تاکہ ڈاؤنلوڈنگ کا مسئلہ نہ آئے
+    - name: Setup Gradle Cache
+      uses: gradle/actions/setup-gradle@v3
+
     - name: Dynamically Create Native Kotlin Project
       run: |
         mkdir -p ZeeshanAIChat/app/src/main/java/com/zeeshan/aichat
         mkdir -p ZeeshanAIChat/app/src/main/res/layout
         mkdir -p ZeeshanAIChat/app/src/main/res/values
         cd ZeeshanAIChat
+
+        # 0. gradle.properties (CRITICAL FIX FOR MEMORY & ANDROIDX)
+        cat << 'EOF' > gradle.properties
+        android.useAndroidX=true
+        android.enableJetifier=true
+        org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+        EOF
 
         # 1. settings.gradle.kts
         cat << 'EOF' > settings.gradle.kts
@@ -102,15 +113,14 @@ jobs:
         }
         EOF
 
-        # 4. AndroidManifest.xml (With Permissions)
+        # 4. AndroidManifest.xml
         cat << 'EOF' > app/src/main/AndroidManifest.xml
         <?xml version="1.0" encoding="utf-8"?>
         <manifest xmlns:android="http://schemas.android.com/apk/res/android"
             package="com.zeeshan.aichat">
             
-            <!-- Permissions Required by App -->
             <uses-permission android:name="android.permission.RECORD_AUDIO" />
-            <uses-permission android:name="android.permission.INTERNET" /> <!-- Required by some TTS engines -->
+            <uses-permission android:name="android.permission.INTERNET" />
 
             <application
                 android:allowBackup="true"
@@ -260,7 +270,6 @@ jobs:
                 super.onCreate(savedInstanceState)
                 setContentView(R.layout.activity_main)
 
-                // Initialize Views
                 inputBox = findViewById(R.id.inputBox)
                 outputText = findViewById(R.id.outputText)
                 val btnMic = findViewById<ImageButton>(R.id.btnMic)
@@ -268,18 +277,13 @@ jobs:
                 val btnRead = findViewById<Button>(R.id.btnRead)
                 val btnStop = findViewById<Button>(R.id.btnStop)
 
-                // Request Permissions on Startup
                 checkPermissions()
-
-                // Initialize TTS
                 tts = TextToSpeech(this, this)
 
-                // Mic Button Click listener
                 btnMic.setOnClickListener {
                     startVoiceInput()
                 }
 
-                // Generate Button Click listener
                 btnGenerate.setOnClickListener {
                     val prompt = inputBox.text.toString().trim()
                     if (prompt.isNotEmpty()) {
@@ -291,7 +295,6 @@ jobs:
                     }
                 }
 
-                // TTS Read Button
                 btnRead.setOnClickListener {
                     val textToRead = outputText.text.toString()
                     if (textToRead.isNotEmpty() && textToRead != "Output will appear here...") {
@@ -299,7 +302,6 @@ jobs:
                     }
                 }
 
-                // TTS Stop Button
                 btnStop.setOnClickListener {
                     if (tts.isSpeaking) {
                         tts.stop()
@@ -316,7 +318,7 @@ jobs:
             private fun startVoiceInput() {
                 val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                 intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN") // Default mic language Hindi/English mix
+                intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
                 intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
                 
                 try {
@@ -336,7 +338,6 @@ jobs:
 
             override fun onInit(status: Int) {
                 if (status == TextToSpeech.SUCCESS) {
-                    // Set AI Voice to Hindi
                     val result = tts.setLanguage(Locale("hi", "IN"))
                     if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                         Toast.makeText(this, "Hindi Voice Data not found!", Toast.LENGTH_SHORT).show()
@@ -344,11 +345,10 @@ jobs:
                 }
             }
 
-            // Zeeshan AI Offline Engine (Simulated Logic for Fast & Crash-Free execution)
             private fun generateHindiStory(prompt: String): String {
                 val intros = listOf(
                     "एक समय की बात है, जब दुनिया बहुत अलग थी।",
-                    "बहुत पुरानी बात है, एक रहस्यमयी जगह पर।",
+                    "बहुत पुरानी बात है, ایک रहस्यमयी जगह पर।",
                     "यह कहानी तब की है, जब जादू सच्चाई हुआ करता था।"
                 )
                 val plots = listOf(
@@ -379,11 +379,17 @@ jobs:
         }
         EOF
 
-    - name: Build APK with Gradle
+    - name: Build APK with Locked Gradle Version
       run: |
         cd ZeeshanAIChat
-        gradle wrapper
-        ./gradlew assembleDebug
+        # 1. Force exact Gradle version download
+        gradle wrapper --gradle-version 8.4
+        
+        # 2. Give execution permission to gradlew (CRITICAL LINUX FIX)
+        chmod +x gradlew
+        
+        # 3. Build with stacktrace to see any hidden errors
+        ./gradlew assembleDebug --stacktrace
 
     - name: Upload AI Chat APK
       uses: actions/upload-artifact@v4
